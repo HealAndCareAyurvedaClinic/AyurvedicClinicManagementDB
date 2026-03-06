@@ -1,0 +1,11 @@
+GO
+ALTER DATABASE AyurvedicClinicMgmt SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+
+GO
+RESTORE DATABASE AyurvedicClinicMgmt
+FROM DISK = 'C:\SQLBackups\AyurvedicClinicMgmt.bak'  
+WITH REPLACE;
+
+GO
+
+ALTER DATABASE AyurvedicClinicMgmt SET MULTI_USER;
