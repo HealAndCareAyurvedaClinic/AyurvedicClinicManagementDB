@@ -1,0 +1,37 @@
+# Every script that changes a database, in the order it must run.
+#
+# This file is the order. Alphabetical ordering was not enough — the seeds depend on
+# each other, and a number prefix on thirteen files would not have said why.
+#
+# Adding a .sql file without adding it here fails the check. That is deliberate: the
+# thirteen tenancy migrations went missing from the .sqlproj precisely because nothing
+# noticed they were absent.
+#
+# Blank lines and lines starting with # are ignored.
+
+# ---------------------------------------------------------------- schema
+# Structure first: the seeds below insert into tables these scripts reshape.
+tenancy/01-add-tenant-and-branch.sql
+tenancy/02-rescope-constraints.sql
+tenancy/03-audit-actor.sql
+tenancy/04-user-branches.sql
+tenancy/05-updated-at-nullable.sql
+tenancy/06-subdomain-registry.sql
+tenancy/07-tenant-lifecycle.sql
+tenancy/08-subscription-plans.sql
+tenancy/09-audit-platform-changes.sql
+tenancy/10-isolation-mode.sql
+tenancy/11-clinic-timezone.sql
+tenancy/12-number-series.sql
+tenancy/13-branch-stock-transfer.sql
+
+# ---------------------------------------------------------------- reference data
+# Order matters here and is not alphabetical:
+#   the base access-rights rows exist before anything makes them usable,
+#   and the individual screens are registered after the model they plug into.
+seed-access-rights-data.sql
+seed-role-access-baseline.sql
+seed-screen-authorization.sql
+seed-branches-screen.sql
+seed-all-branches-permission.sql
+seed-pharmacy-import-export-screen.sql
