@@ -1,0 +1,111 @@
+# Applies pending migrations to the DEV database.
+#
+# Runs on windows-latest because Apply-Database.ps1 drives sqlcmd, which is on PATH on
+# the Windows runner image. (Windows minutes bill at 2x, but this job is seconds long.)
+#
+# IMPORTANT: this cannot create a database from nothing. The scripts in manifest.txt are
+# migrations — they reshape tables that must already exist, and the table definitions are
+# the .sqlproj's business. A brand-new DEV database needs its baseline schema loaded once,
+# by hand, before this workflow can do anything. See docs/cicd-setup.md.
+name: DB Deploy (Dev)
+
+on:
+  push:
+    branches:
+      # `develop` per the branching-strategy doc; `main` until develop exists.
+      - develop
+      - main
+    paths:
+      - 'tenancy/**'
+      - 'seed-*.sql'
+      - 'deploy/**'
+      - '.github/workflows/db-cd-dev.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # OIDC federated login to Azure
+
+# Two runs applying migrations to one database at the same time is how a ledger and a
+# schema stop agreeing. Queue, never cancel: a cancelled run could be killed between
+# applying a script and recording it.
+concurrency:
+  group: db-deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy-dev:
+    name: Apply migrations to DEV
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    environment:
+      name: dev
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # GitHub's runners have dynamic public IPs and are not Azure, so "Allow Azure
+      # services" does not let them in. The rule is opened for this run and closed again
+      # below, rather than leaving a permanent hole for a whole IP range.
+      - name: Open the SQL firewall for this runner
+        id: firewall
+        shell: pwsh
+        run: |
+          $ip = (Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 20).Trim()
+          Write-Host "runner ip: $ip"
+          az sql server firewall-rule create `
+            --resource-group '${{ vars.AZURE_RESOURCE_GROUP }}' `
+            --server '${{ vars.AZURE_SQL_SERVER }}' `
+            --name 'gh-${{ github.run_id }}' `
+            --start-ip-address $ip --end-ip-address $ip --output none
+          if ($LASTEXITCODE -ne 0) { throw "Could not open the SQL firewall." }
+
+      # Logged before anything changes, so the run itself records what this deployment
+      # was about to do to DEV.
+      - name: What would be applied
+        shell: pwsh
+        run: |
+          ./deploy/Apply-Database.ps1 `
+            -Server '${{ vars.AZURE_SQL_SERVER }}.database.windows.net' `
+            -Database '${{ vars.AZURE_SQL_DATABASE }}' `
+            -User '${{ secrets.SQL_ADMIN_USER }}' `
+            -Password '${{ secrets.SQL_ADMIN_PASSWORD }}' `
+            -DryRun
+
+      # Idempotent and ledger-recorded: already-applied scripts are skipped, a failure
+      # stops the run and attempts nothing after it, and re-running picks up where it
+      # stopped. So a red run here is safe to fix forward.
+      - name: Apply
+        shell: pwsh
+        run: |
+          ./deploy/Apply-Database.ps1 `
+            -Server '${{ vars.AZURE_SQL_SERVER }}.database.windows.net' `
+            -Database '${{ vars.AZURE_SQL_DATABASE }}' `
+            -User '${{ secrets.SQL_ADMIN_USER }}' `
+            -Password '${{ secrets.SQL_ADMIN_PASSWORD }}'
+
+      # always(): a failed deploy must not leave the firewall open behind it.
+      - name: Close the SQL firewall
+        if: always() && steps.firewall.outcome == 'success'
+        shell: pwsh
+        run: |
+          az sql server firewall-rule delete `
+            --resource-group '${{ vars.AZURE_RESOURCE_GROUP }}' `
+            --server '${{ vars.AZURE_SQL_SERVER }}' `
+            --name 'gh-${{ github.run_id }}' --output none
+          Write-Host "firewall rule gh-${{ github.run_id }} removed"
+
+      - name: Log out of Azure
+        if: always()
+        shell: pwsh
+        run: az logout
+        continue-on-error: true

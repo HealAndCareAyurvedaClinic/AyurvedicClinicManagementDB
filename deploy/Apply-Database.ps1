@@ -16,33 +16,45 @@
     table is not there to make them safe — it is there so an environment can say what it
     is running, and so a deployment does not take longer every time.
 
+.PARAMETER ValidateOnly
+    Checks that every script which changes a database is registered in the manifest, and
+    that the manifest names nothing missing, then stops. Touches no database and needs no
+    credentials, so a pull request can be checked before there is anywhere to deploy it to.
+
 .PARAMETER Baseline
     Records every script as applied WITHOUT running any of them. For adopting a database
     that already has the schema — this laptop's, for one. Never use it on a database that
     has not actually had the scripts applied.
 
 .EXAMPLE
+    ./Apply-Database.ps1 -ValidateOnly
     ./Apply-Database.ps1 -Server . -Database AyurvedicClinicMgmt -User user1 -Password xxx -DryRun
     ./Apply-Database.ps1 -Server . -Database AyurvedicClinicMgmt -Integrated -Baseline
     ./Apply-Database.ps1 -Server sql-clinic-nonprod.database.windows.net -Database sqldb-clinic-dev -User x -Password y
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string] $Server,
-    [Parameter(Mandatory)][string] $Database,
+    [string] $Server,
+    [string] $Database,
     [string] $User,
     [string] $Password,
     [switch] $Integrated,
     [switch] $DryRun,
-    [switch] $Baseline
+    [switch] $Baseline,
+    [switch] $ValidateOnly
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $manifestPath = Join-Path $PSScriptRoot 'manifest.txt'
 
-if (-not $Integrated -and (-not $User -or -not $Password)) {
-    throw "Give either -Integrated, or both -User and -Password."
+if (-not $ValidateOnly) {
+    if (-not $Server -or -not $Database) {
+        throw "Give -Server and -Database, or -ValidateOnly to just check the manifest."
+    }
+    if (-not $Integrated -and (-not $User -or -not $Password)) {
+        throw "Give either -Integrated, or both -User and -Password."
+    }
 }
 
 # sqlcmd rather than a SQL client library: it is already on any machine with SQL tooling,
@@ -50,7 +62,7 @@ if (-not $Integrated -and (-not $User -or -not $Password)) {
 # because these scripts use batch separators and splitting on them by hand is a known
 # way to break DDL that must stand alone in its own batch.
 $sqlcmd = (Get-Command sqlcmd -ErrorAction SilentlyContinue).Source
-if (-not $sqlcmd) { throw "sqlcmd is not on PATH. Install the SQL Server command line tools." }
+if (-not $sqlcmd -and -not $ValidateOnly) { throw "sqlcmd is not on PATH. Install the SQL Server command line tools." }
 
 $auth = if ($Integrated) { @('-E') } else { @('-U', $User, '-P', $Password) }
 # -b so a failing script fails this script. Without it sqlcmd reports the error and
@@ -81,7 +93,11 @@ function Get-Checksum {
 }
 
 Write-Host ""
-Write-Host "  $Database on $Server" -ForegroundColor Cyan
+if ($ValidateOnly) {
+    Write-Host "  checking deploy/manifest.txt" -ForegroundColor Cyan
+} else {
+    Write-Host "  $Database on $Server" -ForegroundColor Cyan
+}
 Write-Host ""
 
 # ------------------------------------------------------------------ the manifest
@@ -97,7 +113,9 @@ $planned = Get-Content $manifestPath |
 $notMigrations = @('restore.sql')
 $onDisk = Get-ChildItem -Path $root -Filter *.sql -Recurse |
     Where-Object {
-        $_.FullName -notmatch '\\(bin|obj|dbo|test-environment)\\' -and
+        # Either separator: the same check has to hold on a Linux build agent, where
+        # these paths arrive with forward slashes and a backslash matches nothing.
+        $_.FullName -notmatch '[\\/](bin|obj|dbo|test-environment)[\\/]' -and
         $notMigrations -notcontains $_.Name
     } |
     ForEach-Object { (Resolve-Path -Relative -Path $_.FullName -RelativeBasePath $root) -replace '^\.[\\/]','' -replace '\\','/' }
@@ -112,6 +130,12 @@ if ($unregistered) {
 
 $missing = $planned | Where-Object { -not (Test-Path (Join-Path $root $_)) }
 if ($missing) { throw "The manifest names scripts that do not exist: $($missing -join ', ')" }
+
+if ($ValidateOnly) {
+    Write-Host "  $($planned.Count) scripts registered, all present." -ForegroundColor Green
+    Write-Host ""
+    exit 0
+}
 
 # ------------------------------------------------------------------ the ledger
 Invoke-Sql -Query @"

@@ -1,0 +1,35 @@
+# Pull-request validation for the database.
+#
+# There is no database to validate against on a pull request, and there does not need to
+# be: the failure this guards is a .sql file that changes a database and was never added
+# to deploy/manifest.txt. That is exactly how thirteen tenancy migrations went missing
+# from the .sqlproj, and it is silent — the script sits in the repo looking applied.
+#
+# -ValidateOnly needs no server, no credentials and no sqlcmd, so this runs in seconds.
+name: DB CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-manifest:
+    name: Validate manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Every migration is registered, and every registration exists
+        shell: pwsh
+        run: ./deploy/Apply-Database.ps1 -ValidateOnly
