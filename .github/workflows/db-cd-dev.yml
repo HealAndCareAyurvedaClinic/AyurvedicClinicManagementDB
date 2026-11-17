@@ -7,19 +7,26 @@
 # migrations — they reshape tables that must already exist, and the table definitions are
 # the .sqlproj's business. A brand-new DEV database needs its baseline schema loaded once,
 # by hand, before this workflow can do anything. See docs/cicd-setup.md.
+#
+# NOT WIRED UP, DELIBERATELY. The database is applied by hand — see deploy/README.md —
+# so this runs only when somebody asks for it, never on a push.
+#
+# It fired once on a push to main, touched `deploy/**`, and failed at "Log in to Azure"
+# with "Not all values are present". That was correct behaviour reported badly: this
+# repository has no `dev` Environment, so `vars.AZURE_CLIENT_ID` and the rest resolved to
+# empty strings. Before this workflow can work at all it needs two things that only exist
+# for the API repository today:
+#
+#   1. a `dev` Environment here, with the same five AZURE_* variables, and
+#   2. its own federated credential on id-github-clinic-api-dev-cin-01, because the
+#      subject names one repository:
+#          repo:HealAndCareAyurvedaClinic/AyurvedicClinicManagementDB:environment:dev
+#
+# Until both exist, running this by hand will fail the same way.
+#
 name: DB Deploy (Dev)
 
 on:
-  push:
-    branches:
-      # `develop` per the branching-strategy doc; `main` until develop exists.
-      - develop
-      - main
-    paths:
-      - 'tenancy/**'
-      - 'seed-*.sql'
-      - 'deploy/**'
-      - '.github/workflows/db-cd-dev.yml'
   workflow_dispatch:
 
 permissions:
