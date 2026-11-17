@@ -110,7 +110,10 @@ $planned = Get-Content $manifestPath |
 # Anything that changes a database and is not in the manifest is a script somebody will
 # forget to run. Table definitions are the .sqlproj's business, and these two are tools
 # rather than migrations.
-$notMigrations = @('restore.sql')
+# baseline-schema.sql builds the tables an empty database has to have before any of
+# these migrations can reshape them. It runs once, by hand, ahead of this script - so it
+# is a tool in the same sense restore.sql is, not a step in the ordered sequence.
+$notMigrations = @('restore.sql', 'baseline-schema.sql', 'baseline-shared-data.sql')
 $onDisk = Get-ChildItem -Path $root -Filter *.sql -Recurse |
     Where-Object {
         # Either separator: the same check has to hold on a Linux build agent, where
