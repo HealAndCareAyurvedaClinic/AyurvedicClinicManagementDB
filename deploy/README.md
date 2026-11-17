@@ -56,11 +56,25 @@ so regenerating them for QA and UAT is one command each.
 ./deploy/Export-SharedCatalogue.ps1 -OutFile ./deploy/baseline-shared-data.sql
 ```
 
-Then, against the empty database, in this order:
+Then one command does the rest:
 
 ```powershell
-sqlcmd -S <server> -d <database> -U <user> -P <pw> -b -i deploy/baseline-schema.sql
-sqlcmd -S <server> -d <database> -U <user> -P <pw> -b -i deploy/baseline-shared-data.sql
+./deploy/Bootstrap-AzureDatabase.ps1 `
+  -Server sql-clinic-nonprod-cin-hc01.database.windows.net `
+  -Database sqldb-clinic-dev -User sqldba -Password '<pw>'
+```
+
+It runs the three steps in the only order that works, refuses a database that already has
+tables unless you pass `-Force`, and retries the first connection while a paused
+serverless database resumes — which it will, and which looks like a failure if you do not
+expect it. It finishes by counting what it made: 82 tables, 243 foreign keys, 99 catalogue
+rows, 19 recorded, 0 clinics.
+
+By hand, the same three steps are:
+
+```powershell
+sqlcmd -S <server> -d <database> -U <user> -P <pw> -b -l 120 -i deploy/baseline-schema.sql
+sqlcmd -S <server> -d <database> -U <user> -P <pw> -b -l 120 -i deploy/baseline-shared-data.sql
 ./deploy/Apply-Database.ps1 -Server <server> -Database <database> -User <user> -Password <pw> -Baseline
 ```
 
@@ -87,7 +101,12 @@ no patient, billing or clinical data can be in it.
 
 ### Verified
 
-The whole sequence was run against an empty database and then driven through the API: 81
+`sqldb-clinic-dev` was built this way on 17 November 2026 — 82 tables, 243 foreign keys, 99
+catalogue rows, 19 recorded, 0 clinics — and the API, run against it, answered
+`GET /health` with 200 `Healthy`.
+
+Before that, on a throwaway local database, the whole sequence was run and then driven
+through the API: 81
 tables and 243 foreign keys created, 99 catalogue rows loaded, 19 scripts recorded,
 `GET /health` returned 200 `Healthy`, a clinic provisioned with 7 roles and **75 menu
 grants and 33 screen grants**, and that clinic's admin signed in and read
