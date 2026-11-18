@@ -78,7 +78,9 @@ only order that works.
 
 A schema change almost always needs the API and UI to follow. The order across the three
 repos is **DB → API → UI**, deploying between each, because the API reads a schema that
-must already exist and the UI reads an API contract that must already be deployed.
+must already exist and the UI reads an API contract that must already be deployed. The
+**`three-repo-change`** skill in the API repo covers the sequencing in full, including why
+each step has to be safe to deploy on its own.
 
 ---
 
