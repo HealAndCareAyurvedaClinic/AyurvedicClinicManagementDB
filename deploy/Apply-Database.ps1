@@ -118,7 +118,11 @@ $onDisk = Get-ChildItem -Path $root -Filter *.sql -Recurse |
     Where-Object {
         # Either separator: the same check has to hold on a Linux build agent, where
         # these paths arrive with forward slashes and a backslash matches nothing.
-        $_.FullName -notmatch '[\\/](bin|obj|dbo|test-environment)[\\/]' -and
+        # one-off/ holds scripts written for the data in one specific database -- an id
+        # remap, a backfill -- run by hand, once, against that database only. They are
+        # not migrations: they must never be replayed everywhere, so they are not in the
+        # manifest, and the unregistered-script check must not demand that they are.
+        $_.FullName -notmatch '[\\/](bin|obj|dbo|test-environment|one-off)[\\/]' -and
         $notMigrations -notcontains $_.Name
     } |
     ForEach-Object { (Resolve-Path -Relative -Path $_.FullName -RelativeBasePath $root) -replace '^\.[\\/]','' -replace '\\','/' }
