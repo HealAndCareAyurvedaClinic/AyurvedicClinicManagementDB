@@ -115,7 +115,9 @@ BEGIN
         ON s.staff_name = d.doctor_name
        AND s.tenant_id  = d.tenant_id;
 
-    PRINT '  doctors matched to staff: ' + CAST((SELECT COUNT(*) FROM @map) AS VARCHAR);
+    -- PRINT takes an expression, not a subquery, so the count is read into a variable.
+    DECLARE @matched INT = (SELECT COUNT(*) FROM @map);
+    PRINT '  doctors matched to staff: ' + CAST(@matched AS VARCHAR);
     DECLARE @moved VARCHAR(MAX) = '';
     SELECT @moved = @moved + '    doctor ' + CAST(doctor_id AS VARCHAR)
                   + ' -> staff ' + CAST(staff_id AS VARCHAR) + CHAR(13) + CHAR(10)
