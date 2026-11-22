@@ -147,6 +147,39 @@ sqlcmd -S <server> -d <database> -U <user> -P <pw> -C -b -h -1 -W -Q "SET NOCOUN
 
 ---
 
+## ⚠️ `baseline-schema.sql` is older than the migrations
+
+It was exported when there were **13** tenancy migrations. There are now **15**, and it
+has not been re-exported: it has no `Pharmacist` staff type and still contains the
+`doctors` table. `deploy/README.md` still says "thirteen" and "19 recorded"; the manifest
+holds 21.
+
+This is not cosmetic. `Bootstrap-AzureDatabase.ps1` finishes with `Apply-Database
+-Baseline`, which records every manifest script as applied **without running it**. A
+database built from this baseline gets the pre-14/15 schema *and* a ledger claiming it
+has 14 and 15 — so it will never receive them.
+
+**It has already happened.** `sqldb-clinic-dev` was built this way on 17 November. Once
+the API was deployed from code expecting the merged shape, every query touching `staff`
+failed with `Invalid column name 'consultation_fee'` (SQL error 207), taking out
+`/api/Staff`, `/api/Doctors`, `/api/Appointments` and `/api/Users`. The repair is
+`one-off/2026-11-22-dev-doctors-into-staff-with-data.sql`.
+
+**Before building QA or UAT**, re-export from a database that has all 15 applied, and
+regenerate the vocabulary reference from it:
+
+```powershell
+./deploy/Export-BaselineSchema.ps1  -OutFile ./deploy/baseline-schema.sql   # PowerShell 5.1
+./deploy/Export-SharedCatalogue.ps1 -OutFile ./deploy/baseline-shared-data.sql
+python .claude/skills/clinic-vocab/extract-vocabularies.py
+```
+
+## Hand-run repairs live in `one-off/`
+
+A script written for one database's actual rows is not a migration and must never be
+replayed everywhere, so it stays out of the manifest and the validator skips that
+directory. See `one-off/README.md`.
+
 ## Known problems, not yet fixed
 
 - **`seed-access-rights-data.sql` line 26 has a hardcoded `USE [AyurvedicClinicMgmt]`**,
