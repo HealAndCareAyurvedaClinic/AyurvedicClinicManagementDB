@@ -73,7 +73,7 @@ only order that works.
    `.sqlproj` because nothing noticed.
 3. Make it idempotent and make it refuse rather than corrupt. The existing migrations guard
    with `IF EXISTS` and raise `THROW 51000`-range errors when a precondition does not hold
-   (see `14-pharmacist-staff-type.sql`, `15-doctors-into-staff.sql`).
+   (see `14-pharmacist-staff-type.sql`, `15-link-doctor-to-staff.sql`).
 4. Apply it with `-DryRun` first, then for real, then confirm against a live database.
 
 A schema change almost always needs the API and UI to follow. The order across the three
@@ -150,8 +150,7 @@ sqlcmd -S <server> -d <database> -U <user> -P <pw> -C -b -h -1 -W -Q "SET NOCOUN
 ## ⚠️ `baseline-schema.sql` is older than the migrations
 
 It was exported when there were **13** tenancy migrations. There are now **15**, and it
-has not been re-exported: it has no `Pharmacist` staff type and still contains the
-`doctors` table. `deploy/README.md` still says "thirteen" and "19 recorded"; the manifest
+has not been re-exported: it has no `Pharmacist` staff type and no `doctors.staff_id`. `deploy/README.md` still says "thirteen" and "19 recorded"; the manifest
 holds 21.
 
 This is not cosmetic. `Bootstrap-AzureDatabase.ps1` finishes with `Apply-Database
@@ -162,8 +161,10 @@ has 14 and 15 — so it will never receive them.
 **It has already happened.** `sqldb-clinic-dev` was built this way on 17 November. Once
 the API was deployed from code expecting the merged shape, every query touching `staff`
 failed with `Invalid column name 'consultation_fee'` (SQL error 207), taking out
-`/api/Staff`, `/api/Doctors`, `/api/Appointments` and `/api/Users`. The repair is
-`one-off/2026-11-22-dev-doctors-into-staff-with-data.sql`.
+`/api/Staff`, `/api/Doctors`, `/api/Appointments` and `/api/Users`. That change was
+reverted; the lesson stands. **Run the migrations against an environment before
+deploying code that depends on them**, and never trust the ledger on a database built
+from this baseline.
 
 **Before building QA or UAT**, re-export from a database that has all 15 applied, and
 regenerate the vocabulary reference from it:
