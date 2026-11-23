@@ -113,7 +113,10 @@ $planned = Get-Content $manifestPath |
 # baseline-schema.sql builds the tables an empty database has to have before any of
 # these migrations can reshape them. It runs once, by hand, ahead of this script - so it
 # is a tool in the same sense restore.sql is, not a step in the ordered sequence.
-$notMigrations = @('restore.sql', 'baseline-schema.sql', 'baseline-shared-data.sql')
+# schema-fingerprint.sql only reads sys.* and returns rows. It changes nothing, so it is
+# a tool as well -- see its header, and deploy/README.md on comparing two databases.
+$notMigrations = @('restore.sql', 'baseline-schema.sql', 'baseline-shared-data.sql',
+                   'schema-fingerprint.sql')
 $onDisk = Get-ChildItem -Path $root -Filter *.sql -Recurse |
     Where-Object {
         # Either separator: the same check has to hold on a Linux build agent, where
