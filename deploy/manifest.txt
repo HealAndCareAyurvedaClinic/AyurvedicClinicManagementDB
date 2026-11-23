@@ -26,6 +26,7 @@ tenancy/12-number-series.sql
 tenancy/13-branch-stock-transfer.sql
 tenancy/14-pharmacist-staff-type.sql
 tenancy/15-link-doctor-to-staff.sql
+tenancy/16-patient-delete-no-cascade.sql
 
 # ---------------------------------------------------------------- reference data
 # Order matters here and is not alphabetical:
