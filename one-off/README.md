@@ -33,6 +33,9 @@ Follow what `tenancy/*.sql` already does:
 
 ## What is here
 
-| Script | Database | Why |
-| --- | --- | --- |
-| `2026-11-22-dev-doctors-into-staff-with-data.sql` | `sqldb-clinic-dev` | `tenancy/15` refuses once appointments exist; DEV had them by the time the schema caught up. Does 15's job with an id remap in the middle. |
+Nothing at present.
+
+`2026-11-22-dev-doctors-into-staff-with-data.sql` lived here until the doctors-into-staff
+change was reverted. It repaired a database to a shape the schema no longer has, so it was
+removed with the migration it belonged to. Both are in the history if that change is ever
+revisited.
