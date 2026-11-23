@@ -25,7 +25,6 @@ tenancy/11-clinic-timezone.sql
 tenancy/12-number-series.sql
 tenancy/13-branch-stock-transfer.sql
 tenancy/14-pharmacist-staff-type.sql
-tenancy/15-doctors-into-staff.sql
 
 # ---------------------------------------------------------------- reference data
 # Order matters here and is not alphabetical:
