@@ -147,32 +147,52 @@ sqlcmd -S <server> -d <database> -U <user> -P <pw> -C -b -h -1 -W -Q "SET NOCOUN
 
 ---
 
-## ⚠️ `baseline-schema.sql` is older than the migrations
+## ⚠️ Re-export `baseline-schema.sql` whenever you add a migration
 
-It was exported when there were **13** tenancy migrations. There are now **15**, and it
-has not been re-exported: it has no `Pharmacist` staff type and no `doctors.staff_id`. `deploy/README.md` still says "thirteen" and "19 recorded"; the manifest
-holds 21.
+It is current as of **28 November 2026**: all 16 tenancy migrations, all 22 manifest
+scripts, `Pharmacist` and `doctors.staff_id` both in it. Rebuilt from scratch into an
+empty database that day to prove it still builds one — 81 tables, 1222 columns, 244
+foreign keys, 154 check constraints, 99 catalogue rows. Those are the live counts less
+`dbo.schema_versions` and its five columns, which the exporter omits deliberately.
 
-This is not cosmetic. `Bootstrap-AzureDatabase.ps1` finishes with `Apply-Database
--Baseline`, which records every manifest script as applied **without running it**. A
-database built from this baseline gets the pre-14/15 schema *and* a ledger claiming it
-has 14 and 15 — so it will never receive them.
+**Letting it fall behind is not cosmetic, and it has already cost two outages.**
+`Bootstrap-AzureDatabase.ps1` finishes with `Apply-Database -Baseline`, which records
+every manifest script as applied **without running it**. A database built from a stale
+baseline therefore gets the old schema *and* a ledger swearing it has the new one — so it
+can never receive the missing migrations. The ledger is not a record of what ran; it is a
+record of what the baseline was believed to contain.
 
-**It has already happened.** `sqldb-clinic-dev` was built this way on 17 November. Once
-the API was deployed from code expecting the merged shape, every query touching `staff`
-failed with `Invalid column name 'consultation_fee'` (SQL error 207), taking out
-`/api/Staff`, `/api/Doctors`, `/api/Appointments` and `/api/Users`. That change was
-reverted; the lesson stands. **Run the migrations against an environment before
-deploying code that depends on them**, and never trust the ledger on a database built
-from this baseline.
+It happened twice. `sqldb-clinic-dev` was built on 17 November from a baseline exported at
+thirteen migrations, and every query touching `staff` failed with `Invalid column name
+'consultation_fee'` (SQL 207) once the API expected the merged shape. The same database
+was still missing 14 and 15 on 28 November, failing on `staff_id`, and had to have all
+three applied by hand.
 
-**Before building QA or UAT**, re-export from a database that has all 15 applied, and
-regenerate the vocabulary reference from it:
+So, **after adding `tenancy/NN-*.sql` and the manifest entry**, re-export — from a
+database that genuinely has it applied, which `Apply-Database.ps1` will confirm:
 
 ```powershell
-./deploy/Export-BaselineSchema.ps1  -OutFile ./deploy/baseline-schema.sql   # PowerShell 5.1
+# PowerShell 5.1 — the exporter uses SMO, which does not load in PowerShell 7
+powershell.exe -NoProfile -File ./deploy/Export-BaselineSchema.ps1 -OutFile ./deploy/baseline-schema.sql
+
+# Only if the menu/screen catalogue changed; it is unchanged far more often than not,
+# and a re-export otherwise churns the file for a timestamp.
 ./deploy/Export-SharedCatalogue.ps1 -OutFile ./deploy/baseline-shared-data.sql
+
 python .claude/skills/clinic-vocab/extract-vocabularies.py
+```
+
+Then **build an empty database from it and count**, because an export that does not build
+is worse than no export. `baseline-schema.sql` is single-use by design — 192 of 252 column
+defaults are unnamed, so a second run tries to re-add them — which means a throwaway
+database is the only honest test:
+
+```powershell
+sqlcmd -S . -E -C -b -Q "CREATE DATABASE [zz_verify];"
+sqlcmd -S . -d zz_verify -E -C -b -i ./deploy/baseline-schema.sql
+sqlcmd -S . -d zz_verify -E -C -b -i ./deploy/baseline-shared-data.sql
+# compare counts against the source database, then:
+sqlcmd -S . -E -C -b -Q "ALTER DATABASE [zz_verify] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [zz_verify];"
 ```
 
 ## Hand-run repairs live in `one-off/`

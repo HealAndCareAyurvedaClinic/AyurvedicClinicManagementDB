@@ -7,10 +7,10 @@
 
         1. baseline-schema.sql       the 81 tables, their keys and indexes
         2. baseline-shared-data.sql  the 99 rows of menu/screen/section catalogue
-        3. Apply-Database.ps1 -Baseline   records the 19 manifest scripts as applied
+        3. Apply-Database.ps1 -Baseline   records the 22 manifest scripts as applied
 
     Step 3 records rather than runs, and that is not a shortcut. baseline-schema.sql is
-    scripted from a database that already has all thirteen tenancy migrations, so its
+    scripted from a database that already has all sixteen tenancy migrations, so its
     schema IS the post-migration schema. Replaying them fails:
     07-tenant-lifecycle.sql backfills status from is_active and then drops is_active, so
     against a baseline where that column is already gone it has nothing to read. The six

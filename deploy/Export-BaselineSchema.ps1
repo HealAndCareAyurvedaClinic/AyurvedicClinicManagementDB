@@ -12,6 +12,16 @@
     statements at the end. Dependency ordering then does not matter at all, which is a
     great deal more robust than asking SMO to sort 53 tables correctly.
 
+    Run it with powershell.exe, NOT pwsh. It drives SMO, which does not load in
+    PowerShell 7 -- it fails with "Could not load type
+    'Microsoft.SqlServer.Server.SqlContext'", which does not obviously mean "wrong
+    shell". Apply-Database.ps1 next door is the opposite way round and needs pwsh.
+
+        powershell.exe -NoProfile -File ./deploy/Export-BaselineSchema.ps1 -OutFile ./deploy/baseline-schema.sql
+
+    Expect it to take a few minutes: SMO scripts the 81 tables one at a time and writes
+    nothing until the end, so a long silence is normal rather than a hang.
+
     Run it ONCE against an EMPTY database. It is not re-runnable, and deliberately not:
     192 of this schema's 252 column defaults are unnamed, so SQL Server names them with a
     hash of the object id (DF__access_gr__creat__38996AB5). Those names differ from one

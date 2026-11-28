@@ -67,8 +67,8 @@ Then one command does the rest:
 It runs the three steps in the only order that works, refuses a database that already has
 tables unless you pass `-Force`, and retries the first connection while a paused
 serverless database resumes — which it will, and which looks like a failure if you do not
-expect it. It finishes by counting what it made: 82 tables, 243 foreign keys, 99 catalogue
-rows, 19 recorded, 0 clinics.
+expect it. It finishes by counting what it made: 82 tables, 244 foreign keys, 99 catalogue
+rows, 22 recorded, 0 clinics.
 
 By hand, the same three steps are:
 
@@ -83,12 +83,23 @@ creates its branch, roles, access groups, access levels and menu/screen grants.
 
 ### Why `-Baseline`, and why the seeds do not run
 
-`baseline-schema.sql` is scripted from a database that has already had all thirteen tenancy
+`baseline-schema.sql` is scripted from a database that has already had all sixteen tenancy
 migrations applied, so its schema *is* the post-migration schema. Replaying the migrations
 over it does not work and must not be attempted: `07-tenant-lifecycle.sql` backfills
 `status` from `is_active` and then drops `is_active`, so against a baseline where that
-column is already gone it fails outright. `-Baseline` records all nineteen as applied
+column is already gone it fails outright. `-Baseline` records all twenty-two as applied
 without running any, which is the honest record — that schema has had them.
+
+**That record is only honest while the export keeps up with the migrations**, and this is
+the one thing about this file that has actually gone wrong. It was exported at thirteen
+migrations and stayed there while 14 and 15 landed, so a database built from it had no
+`doctors.staff_id` and no `Pharmacist` staff type — and a ledger claiming both were
+applied, which meant they never would be. `sqldb-clinic-dev` was built that way on
+17 November and every query touching `staff` failed until the migrations were applied to
+it by hand on 28 November.
+
+So: **after adding a migration, re-export this file**, or the next environment built from
+it starts life behind and cannot catch up.
 
 The six seed scripts are skipped for the same reason, plus one of their own: they predate
 tenancy and insert into `role_access_groups` without a `tenant_id`, which the migrations
@@ -103,7 +114,15 @@ no patient, billing or clinical data can be in it.
 
 `sqldb-clinic-dev` was built this way on 17 November 2026 — 82 tables, 243 foreign keys, 99
 catalogue rows, 19 recorded, 0 clinics — and the API, run against it, answered
-`GET /health` with 200 `Healthy`.
+`GET /health` with 200 `Healthy`. It was behind by two migrations at the time, for the
+reason above; it was brought up to all 22 on 28 November.
+
+The re-exported baseline was itself rebuilt from scratch on 28 November, into an empty
+throwaway database, to prove it still builds one: 81 tables, 1222 columns, 244 foreign
+keys, 154 check constraints and 99 catalogue rows, with `doctors.staff_id` present,
+`Pharmacist` allowed and no cascading delete left on `patients`. Those counts are the live
+database's exactly, less `dbo.schema_versions` and its five columns, which the exporter
+leaves out on purpose.
 
 Before that, on a throwaway local database, the whole sequence was run and then driven
 through the API: 81

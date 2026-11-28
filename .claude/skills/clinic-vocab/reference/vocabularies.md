@@ -257,7 +257,7 @@ Knowing the column name is not enough for these — the table decides which set 
 
 ### `staff`
 
-- **`staff_type`** — `Admin`, `Assistant Doctor`, `Doctor`, `Nurse`, `Receptionist`, `Therapist`
+- **`staff_type`** — `Admin`, `Assistant Doctor`, `Doctor`, `Nurse`, `Pharmacist`, `Receptionist`, `Therapist`
 
 ### `stock_alerts`
 

@@ -1,6 +1,6 @@
 /*
     Baseline table schema for AyurvedicClinicMgmt.
-    Generated 2026-11-17 21:01 from . by Export-BaselineSchema.ps1.
+    Generated 2026-11-28 11:13 from . by Export-BaselineSchema.ps1.
 
     Run this against an EMPTY Azure SQL database, then run
     deploy/Apply-Database.ps1 against the same database to apply the
@@ -2050,6 +2050,7 @@ CREATE TABLE [dbo].[doctors](
 	[is_active] [bit] NOT NULL,
 	[created_at] [datetime2](0) NOT NULL,
 	[tenant_id] [int] NOT NULL,
+	[staff_id] [int] NULL,
 PRIMARY KEY CLUSTERED 
 (
 	[doctor_id] ASC
@@ -2076,6 +2077,14 @@ CREATE NONCLUSTERED INDEX [IX_doctors_tenant] ON [dbo].[doctors]
 (
 	[tenant_id] ASC
 )WITH (STATISTICS_NORECOMPUTE = OFF, DROP_EXISTING = OFF, ONLINE = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF)
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[doctors]') AND name = N'UQ_doctors_staff_id')
+CREATE UNIQUE NONCLUSTERED INDEX [UQ_doctors_staff_id] ON [dbo].[doctors]
+(
+	[staff_id] ASC
+)
+WHERE ([staff_id] IS NOT NULL)
+WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, DROP_EXISTING = OFF, ONLINE = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF)
 GO
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DF__doctors__is_acti__55BFB948]') AND type = 'D')
 BEGIN
@@ -4848,7 +4857,7 @@ IF  EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[d
 ALTER TABLE [dbo].[staff] CHECK CONSTRAINT [CK_staff_gender]
 GO
 IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_staff_staff_type]') AND parent_object_id = OBJECT_ID(N'[dbo].[staff]'))
-ALTER TABLE [dbo].[staff]  WITH CHECK ADD  CONSTRAINT [CK_staff_staff_type] CHECK  (([staff_type]='Admin' OR [staff_type]='Receptionist' OR [staff_type]='Therapist' OR [staff_type]='Nurse' OR [staff_type]='Assistant Doctor' OR [staff_type]='Doctor'))
+ALTER TABLE [dbo].[staff]  WITH CHECK ADD  CONSTRAINT [CK_staff_staff_type] CHECK  (([staff_type]='Admin' OR [staff_type]='Pharmacist' OR [staff_type]='Receptionist' OR [staff_type]='Therapist' OR [staff_type]='Nurse' OR [staff_type]='Assistant Doctor' OR [staff_type]='Doctor'))
 GO
 IF  EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_staff_staff_type]') AND parent_object_id = OBJECT_ID(N'[dbo].[staff]'))
 ALTER TABLE [dbo].[staff] CHECK CONSTRAINT [CK_staff_staff_type]
@@ -6068,9 +6077,8 @@ IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[
 ALTER TABLE [dbo].[appointments] CHECK CONSTRAINT [FK_apt_doctor]
 GO
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_apt_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[appointments]'))
-ALTER TABLE [dbo].[appointments]  WITH CHECK ADD  CONSTRAINT [FK_apt_patient] FOREIGN KEY([patient_id])
+ALTER TABLE [dbo].[appointments]  WITH NOCHECK ADD  CONSTRAINT [FK_apt_patient] FOREIGN KEY([patient_id])
 REFERENCES [dbo].[patients] ([patient_id])
-ON DELETE CASCADE
 GO
 IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_apt_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[appointments]'))
 ALTER TABLE [dbo].[appointments] CHECK CONSTRAINT [FK_apt_patient]
@@ -6350,6 +6358,13 @@ GO
 IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_ds_doctor]') AND parent_object_id = OBJECT_ID(N'[dbo].[doctor_schedule]'))
 ALTER TABLE [dbo].[doctor_schedule] CHECK CONSTRAINT [FK_ds_doctor]
 GO
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_doctors_staff]') AND parent_object_id = OBJECT_ID(N'[dbo].[doctors]'))
+ALTER TABLE [dbo].[doctors]  WITH CHECK ADD  CONSTRAINT [FK_doctors_staff] FOREIGN KEY([staff_id])
+REFERENCES [dbo].[staff] ([staff_id])
+GO
+IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_doctors_staff]') AND parent_object_id = OBJECT_ID(N'[dbo].[doctors]'))
+ALTER TABLE [dbo].[doctors] CHECK CONSTRAINT [FK_doctors_staff]
+GO
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_doctors_tenant]') AND parent_object_id = OBJECT_ID(N'[dbo].[doctors]'))
 ALTER TABLE [dbo].[doctors]  WITH CHECK ADD  CONSTRAINT [FK_doctors_tenant] FOREIGN KEY([tenant_id])
 REFERENCES [dbo].[tenants] ([tenant_id])
@@ -6436,9 +6451,8 @@ IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[
 ALTER TABLE [dbo].[encounter_prescriptions] CHECK CONSTRAINT [FK_ep_encounter]
 GO
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_ep_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[encounter_prescriptions]'))
-ALTER TABLE [dbo].[encounter_prescriptions]  WITH CHECK ADD  CONSTRAINT [FK_ep_patient] FOREIGN KEY([patient_id])
+ALTER TABLE [dbo].[encounter_prescriptions]  WITH NOCHECK ADD  CONSTRAINT [FK_ep_patient] FOREIGN KEY([patient_id])
 REFERENCES [dbo].[patients] ([patient_id])
-ON DELETE CASCADE
 GO
 IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_ep_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[encounter_prescriptions]'))
 ALTER TABLE [dbo].[encounter_prescriptions] CHECK CONSTRAINT [FK_ep_patient]
@@ -6466,9 +6480,8 @@ IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[
 ALTER TABLE [dbo].[encounter_treatment_plan] CHECK CONSTRAINT [FK_etp_encounter]
 GO
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_etp_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[encounter_treatment_plan]'))
-ALTER TABLE [dbo].[encounter_treatment_plan]  WITH CHECK ADD  CONSTRAINT [FK_etp_patient] FOREIGN KEY([patient_id])
+ALTER TABLE [dbo].[encounter_treatment_plan]  WITH NOCHECK ADD  CONSTRAINT [FK_etp_patient] FOREIGN KEY([patient_id])
 REFERENCES [dbo].[patients] ([patient_id])
-ON DELETE CASCADE
 GO
 IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_etp_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[encounter_treatment_plan]'))
 ALTER TABLE [dbo].[encounter_treatment_plan] CHECK CONSTRAINT [FK_etp_patient]
@@ -6510,9 +6523,8 @@ IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[
 ALTER TABLE [dbo].[follow_up_schedule] CHECK CONSTRAINT [FK_fus_encounter]
 GO
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_fus_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[follow_up_schedule]'))
-ALTER TABLE [dbo].[follow_up_schedule]  WITH CHECK ADD  CONSTRAINT [FK_fus_patient] FOREIGN KEY([patient_id])
+ALTER TABLE [dbo].[follow_up_schedule]  WITH NOCHECK ADD  CONSTRAINT [FK_fus_patient] FOREIGN KEY([patient_id])
 REFERENCES [dbo].[patients] ([patient_id])
-ON DELETE CASCADE
 GO
 IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_fus_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[follow_up_schedule]'))
 ALTER TABLE [dbo].[follow_up_schedule] CHECK CONSTRAINT [FK_fus_patient]
@@ -6625,9 +6637,8 @@ IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[
 ALTER TABLE [dbo].[investigations] CHECK CONSTRAINT [FK_inv_encounter]
 GO
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_inv_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[investigations]'))
-ALTER TABLE [dbo].[investigations]  WITH CHECK ADD  CONSTRAINT [FK_inv_patient] FOREIGN KEY([patient_id])
+ALTER TABLE [dbo].[investigations]  WITH NOCHECK ADD  CONSTRAINT [FK_inv_patient] FOREIGN KEY([patient_id])
 REFERENCES [dbo].[patients] ([patient_id])
-ON DELETE CASCADE
 GO
 IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_inv_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[investigations]'))
 ALTER TABLE [dbo].[investigations] CHECK CONSTRAINT [FK_inv_patient]
@@ -6751,9 +6762,8 @@ IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[
 ALTER TABLE [dbo].[panchkarma_procedures] CHECK CONSTRAINT [FK_pkp_encounter]
 GO
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_pkp_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[panchkarma_procedures]'))
-ALTER TABLE [dbo].[panchkarma_procedures]  WITH CHECK ADD  CONSTRAINT [FK_pkp_patient] FOREIGN KEY([patient_id])
+ALTER TABLE [dbo].[panchkarma_procedures]  WITH NOCHECK ADD  CONSTRAINT [FK_pkp_patient] FOREIGN KEY([patient_id])
 REFERENCES [dbo].[patients] ([patient_id])
-ON DELETE CASCADE
 GO
 IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_pkp_patient]') AND parent_object_id = OBJECT_ID(N'[dbo].[panchkarma_procedures]'))
 ALTER TABLE [dbo].[panchkarma_procedures] CHECK CONSTRAINT [FK_pkp_patient]
