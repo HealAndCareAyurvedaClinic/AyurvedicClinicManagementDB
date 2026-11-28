@@ -1,6 +1,6 @@
 /*
     Baseline table schema for AyurvedicClinicMgmt.
-    Generated 2026-11-28 11:13 from . by Export-BaselineSchema.ps1.
+    Generated 2026-11-28 14:24 from . by Export-BaselineSchema.ps1.
 
     Run this against an EMPTY Azure SQL database, then run
     deploy/Apply-Database.ps1 against the same database to apply the
@@ -1726,6 +1726,145 @@ BEGIN
 ALTER TABLE [dbo].[branches] ADD  CONSTRAINT [DF_branches_created]  DEFAULT (sysutcdatetime()) FOR [created_at]
 END
 
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[clinic_logos]') AND type in (N'U'))
+BEGIN
+CREATE TABLE [dbo].[clinic_logos](
+	[logo_id] [int] IDENTITY(1,1) NOT NULL,
+	[tenant_id] [int] NOT NULL,
+	[file_name] [nvarchar](255) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[mime_type] [nvarchar](100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[size_bytes] [int] NOT NULL,
+	[logo_data] [varbinary](max) NOT NULL,
+	[content_hash] [nvarchar](64) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[width_px] [int] NULL,
+	[height_px] [int] NULL,
+	[uploaded_at] [datetime2](7) NOT NULL,
+	[uploaded_by] [int] NULL,
+ CONSTRAINT [PK_clinic_logos] PRIMARY KEY CLUSTERED 
+(
+	[logo_id] ASC
+)WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF),
+ CONSTRAINT [UQ_clinic_logos_tenant] UNIQUE NONCLUSTERED 
+(
+	[tenant_id] ASC
+)WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF)
+)
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DF_clinic_logos_uploaded]') AND type = 'D')
+BEGIN
+ALTER TABLE [dbo].[clinic_logos] ADD  CONSTRAINT [DF_clinic_logos_uploaded]  DEFAULT (sysutcdatetime()) FOR [uploaded_at]
+END
+
+GO
+IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_logos_mime]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_logos]'))
+ALTER TABLE [dbo].[clinic_logos]  WITH CHECK ADD  CONSTRAINT [CK_clinic_logos_mime] CHECK  (([mime_type]=N'image/webp' OR [mime_type]=N'image/jpeg' OR [mime_type]=N'image/png'))
+GO
+IF  EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_logos_mime]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_logos]'))
+ALTER TABLE [dbo].[clinic_logos] CHECK CONSTRAINT [CK_clinic_logos_mime]
+GO
+IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_logos_size]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_logos]'))
+ALTER TABLE [dbo].[clinic_logos]  WITH CHECK ADD  CONSTRAINT [CK_clinic_logos_size] CHECK  (([size_bytes]>(0) AND [size_bytes]<=(1048576)))
+GO
+IF  EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_logos_size]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_logos]'))
+ALTER TABLE [dbo].[clinic_logos] CHECK CONSTRAINT [CK_clinic_logos_size]
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[clinic_settings]') AND type in (N'U'))
+BEGIN
+CREATE TABLE [dbo].[clinic_settings](
+	[setting_id] [int] IDENTITY(1,1) NOT NULL,
+	[tenant_id] [int] NOT NULL,
+	[clinic_display_name] [nvarchar](200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[tagline] [nvarchar](200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[address_line1] [nvarchar](255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[address_line2] [nvarchar](255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[city] [nvarchar](100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[state] [nvarchar](100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[pincode] [nvarchar](10) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[country] [nvarchar](100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[phone] [nvarchar](50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[email] [nvarchar](255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[website] [nvarchar](255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[registration_number] [nvarchar](100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[gst_number] [nvarchar](20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[doctor_name] [nvarchar](200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[doctor_qualifications] [nvarchar](200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[doctor_registration_number] [nvarchar](100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[prescription_template] [nvarchar](30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[show_logo] [bit] NOT NULL,
+	[logo_height_mm] [decimal](5, 2) NOT NULL,
+	[preprinted_top_margin_mm] [decimal](5, 2) NOT NULL,
+	[prescription_footer_note] [nvarchar](400) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[created_at] [datetime2](7) NOT NULL,
+	[updated_at] [datetime2](7) NULL,
+	[updated_by] [int] NULL,
+ CONSTRAINT [PK_clinic_settings] PRIMARY KEY CLUSTERED 
+(
+	[setting_id] ASC
+)WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF),
+ CONSTRAINT [UQ_clinic_settings_tenant] UNIQUE NONCLUSTERED 
+(
+	[tenant_id] ASC
+)WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF)
+)
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DF_clinic_settings_template]') AND type = 'D')
+BEGIN
+ALTER TABLE [dbo].[clinic_settings] ADD  CONSTRAINT [DF_clinic_settings_template]  DEFAULT (N'Classic') FOR [prescription_template]
+END
+
+GO
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DF_clinic_settings_show_logo]') AND type = 'D')
+BEGIN
+ALTER TABLE [dbo].[clinic_settings] ADD  CONSTRAINT [DF_clinic_settings_show_logo]  DEFAULT ((1)) FOR [show_logo]
+END
+
+GO
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DF_clinic_settings_logo_height]') AND type = 'D')
+BEGIN
+ALTER TABLE [dbo].[clinic_settings] ADD  CONSTRAINT [DF_clinic_settings_logo_height]  DEFAULT ((18.0)) FOR [logo_height_mm]
+END
+
+GO
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DF_clinic_settings_top_margin]') AND type = 'D')
+BEGIN
+ALTER TABLE [dbo].[clinic_settings] ADD  CONSTRAINT [DF_clinic_settings_top_margin]  DEFAULT ((45.0)) FOR [preprinted_top_margin_mm]
+END
+
+GO
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DF_clinic_settings_created]') AND type = 'D')
+BEGIN
+ALTER TABLE [dbo].[clinic_settings] ADD  CONSTRAINT [DF_clinic_settings_created]  DEFAULT (sysutcdatetime()) FOR [created_at]
+END
+
+GO
+IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_settings_logo_height]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_settings]'))
+ALTER TABLE [dbo].[clinic_settings]  WITH CHECK ADD  CONSTRAINT [CK_clinic_settings_logo_height] CHECK  (([logo_height_mm]>(0) AND [logo_height_mm]<=(60)))
+GO
+IF  EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_settings_logo_height]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_settings]'))
+ALTER TABLE [dbo].[clinic_settings] CHECK CONSTRAINT [CK_clinic_settings_logo_height]
+GO
+IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_settings_template]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_settings]'))
+ALTER TABLE [dbo].[clinic_settings]  WITH CHECK ADD  CONSTRAINT [CK_clinic_settings_template] CHECK  (([prescription_template]=N'Preprinted' OR [prescription_template]=N'Compact' OR [prescription_template]=N'Centered' OR [prescription_template]=N'Classic'))
+GO
+IF  EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_settings_template]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_settings]'))
+ALTER TABLE [dbo].[clinic_settings] CHECK CONSTRAINT [CK_clinic_settings_template]
+GO
+IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_settings_top_margin]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_settings]'))
+ALTER TABLE [dbo].[clinic_settings]  WITH CHECK ADD  CONSTRAINT [CK_clinic_settings_top_margin] CHECK  (([preprinted_top_margin_mm]>=(0) AND [preprinted_top_margin_mm]<=(150)))
+GO
+IF  EXISTS (SELECT * FROM sys.check_constraints WHERE object_id = OBJECT_ID(N'[dbo].[CK_clinic_settings_top_margin]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_settings]'))
+ALTER TABLE [dbo].[clinic_settings] CHECK CONSTRAINT [CK_clinic_settings_top_margin]
 GO
 SET ANSI_NULLS ON
 GO
@@ -6265,6 +6404,20 @@ REFERENCES [dbo].[tenants] ([tenant_id])
 GO
 IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_branches_tenant]') AND parent_object_id = OBJECT_ID(N'[dbo].[branches]'))
 ALTER TABLE [dbo].[branches] CHECK CONSTRAINT [FK_branches_tenant]
+GO
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_clinic_logos_tenant]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_logos]'))
+ALTER TABLE [dbo].[clinic_logos]  WITH CHECK ADD  CONSTRAINT [FK_clinic_logos_tenant] FOREIGN KEY([tenant_id])
+REFERENCES [dbo].[tenants] ([tenant_id])
+GO
+IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_clinic_logos_tenant]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_logos]'))
+ALTER TABLE [dbo].[clinic_logos] CHECK CONSTRAINT [FK_clinic_logos_tenant]
+GO
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_clinic_settings_tenant]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_settings]'))
+ALTER TABLE [dbo].[clinic_settings]  WITH CHECK ADD  CONSTRAINT [FK_clinic_settings_tenant] FOREIGN KEY([tenant_id])
+REFERENCES [dbo].[tenants] ([tenant_id])
+GO
+IF  EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_clinic_settings_tenant]') AND parent_object_id = OBJECT_ID(N'[dbo].[clinic_settings]'))
+ALTER TABLE [dbo].[clinic_settings] CHECK CONSTRAINT [FK_clinic_settings_tenant]
 GO
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[dbo].[FK_current_medications_tenant]') AND parent_object_id = OBJECT_ID(N'[dbo].[current_medications]'))
 ALTER TABLE [dbo].[current_medications]  WITH CHECK ADD  CONSTRAINT [FK_current_medications_tenant] FOREIGN KEY([tenant_id])

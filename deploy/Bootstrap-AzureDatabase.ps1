@@ -5,12 +5,12 @@
 .DESCRIPTION
     The three steps of a bootstrap, in the only order that works:
 
-        1. baseline-schema.sql       the 81 tables, their keys and indexes
+        1. baseline-schema.sql       the 83 tables, their keys and indexes
         2. baseline-shared-data.sql  the 99 rows of menu/screen/section catalogue
-        3. Apply-Database.ps1 -Baseline   records the 22 manifest scripts as applied
+        3. Apply-Database.ps1 -Baseline   records the 24 manifest scripts as applied
 
     Step 3 records rather than runs, and that is not a shortcut. baseline-schema.sql is
-    scripted from a database that already has all sixteen tenancy migrations, so its
+    scripted from a database that already has all seventeen tenancy migrations, so its
     schema IS the post-migration schema. Replaying them fails:
     07-tenant-lifecycle.sql backfills status from is_active and then drops is_active, so
     against a baseline where that column is already gone it has nothing to read. The six
@@ -176,14 +176,14 @@ $ledger    = Invoke-Scalar "SELECT COUNT(*) FROM dbo.schema_versions;"
 $tenants   = Invoke-Scalar "SELECT COUNT(*) FROM dbo.tenants;"
 
 Write-Host ""
-Write-Host "  tables          $tables      (expected 82, the 81 plus the ledger)"
-Write-Host "  foreign keys    $fks     (expected 243)"
+Write-Host "  tables          $tables      (expected 84, the 83 plus the ledger)"
+Write-Host "  foreign keys    $fks     (expected 246)"
 Write-Host "  catalogue rows  $catalogueRows      (expected 99)"
-Write-Host "  recorded        $ledger      (expected 19)"
+Write-Host "  recorded        $ledger      (expected 24)"
 Write-Host "  clinics         $tenants       (expected 0 - provisioning creates the first)"
 Write-Host ""
 
-if ($tables -eq '82' -and $catalogueRows -eq '99' -and $ledger -eq '19') {
+if ($tables -eq '84' -and $catalogueRows -eq '99' -and $ledger -eq '24') {
     Write-Host "  Done. Provision the first clinic through POST /api/platform/clinics." -ForegroundColor Green
 } else {
     Write-Host "  Finished, but the numbers are not what was expected - worth a look." -ForegroundColor Yellow

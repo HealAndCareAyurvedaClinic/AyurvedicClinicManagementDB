@@ -67,8 +67,8 @@ Then one command does the rest:
 It runs the three steps in the only order that works, refuses a database that already has
 tables unless you pass `-Force`, and retries the first connection while a paused
 serverless database resumes — which it will, and which looks like a failure if you do not
-expect it. It finishes by counting what it made: 82 tables, 244 foreign keys, 99 catalogue
-rows, 22 recorded, 0 clinics.
+expect it. It finishes by counting what it made: 84 tables, 246 foreign keys, 99 catalogue
+rows, 24 recorded, 0 clinics.
 
 By hand, the same three steps are:
 
@@ -83,11 +83,11 @@ creates its branch, roles, access groups, access levels and menu/screen grants.
 
 ### Why `-Baseline`, and why the seeds do not run
 
-`baseline-schema.sql` is scripted from a database that has already had all sixteen tenancy
-migrations applied, so its schema *is* the post-migration schema. Replaying the migrations
+`baseline-schema.sql` is scripted from a database that has already had all seventeen
+tenancy migrations applied, so its schema *is* the post-migration schema. Replaying the migrations
 over it does not work and must not be attempted: `07-tenant-lifecycle.sql` backfills
 `status` from `is_active` and then drops `is_active`, so against a baseline where that
-column is already gone it fails outright. `-Baseline` records all twenty-two as applied
+column is already gone it fails outright. `-Baseline` records all twenty-four as applied
 without running any, which is the honest record — that schema has had them.
 
 **That record is only honest while the export keeps up with the migrations**, and this is
@@ -101,7 +101,7 @@ it by hand on 28 November.
 So: **after adding a migration, re-export this file**, or the next environment built from
 it starts life behind and cannot catch up.
 
-The six seed scripts are skipped for the same reason, plus one of their own: they predate
+The seven seed scripts are skipped for the same reason, plus one of their own: they predate
 tenancy and insert into `role_access_groups` without a `tenant_id`, which the migrations
 made mandatory. Their reference data arrives two other ways — the shared catalogue
 (`menus`, `screens`, `sections`, `section_fields`) from `baseline-shared-data.sql`, and
@@ -115,18 +115,22 @@ no patient, billing or clinical data can be in it.
 `sqldb-clinic-dev` was built this way on 17 November 2026 — 82 tables, 243 foreign keys, 99
 catalogue rows, 19 recorded, 0 clinics — and the API, run against it, answered
 `GET /health` with 200 `Healthy`. It was behind by two migrations at the time, for the
-reason above; it was brought up to all 22 on 28 November.
+reason above; it was brought up to all 22 on 28 November. **It does not yet have
+migration 17**, so it is two scripts behind again until the clinic-settings change is
+deployed to it.
 
-The re-exported baseline was itself rebuilt from scratch on 28 November, into an empty
-throwaway database, to prove it still builds one: 81 tables, 1222 columns, 244 foreign
-keys, 154 check constraints and 99 catalogue rows, with `doctors.staff_id` present,
-`Pharmacist` allowed and no cascading delete left on `patients`. Those counts are the live
-database's exactly, less `dbo.schema_versions` and its five columns, which the exporter
-leaves out on purpose.
+The re-exported baseline was rebuilt from scratch into an empty throwaway database on
+28 November, and again on 29 November after `17-clinic-settings.sql`, to prove it still
+builds one: **83 tables, 1259 columns, 246 foreign keys, 159 check constraints and 99
+catalogue rows**, with `clinic_settings` and `clinic_logos` present, `doctors.staff_id`
+present, `Pharmacist` allowed and no cascading delete left on `patients`. Those counts are
+the live database's exactly, less `dbo.schema_versions` and its five columns, which the
+exporter leaves out on purpose.
 
 Before that, on a throwaway local database, the whole sequence was run and then driven
 through the API: 81
-tables and 243 foreign keys created, 99 catalogue rows loaded, 19 scripts recorded,
+tables and 243 foreign keys created, 99 catalogue rows loaded, 19 scripts recorded
+(the counts of the day),
 `GET /health` returned 200 `Healthy`, a clinic provisioned with 7 roles and **75 menu
 grants and 33 screen grants**, and that clinic's admin signed in and read
 `/api/Patients` (200, against 401 anonymous). Without `baseline-shared-data.sql` the two

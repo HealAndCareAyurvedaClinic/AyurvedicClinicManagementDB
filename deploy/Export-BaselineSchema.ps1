@@ -19,7 +19,7 @@
 
         powershell.exe -NoProfile -File ./deploy/Export-BaselineSchema.ps1 -OutFile ./deploy/baseline-schema.sql
 
-    Expect it to take a few minutes: SMO scripts the 81 tables one at a time and writes
+    Expect it to take a few minutes: SMO scripts the 83 tables one at a time and writes
     nothing until the end, so a long silence is normal rather than a hang.
 
     Run it ONCE against an EMPTY database. It is not re-runnable, and deliberately not:
