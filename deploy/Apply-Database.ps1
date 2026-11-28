@@ -13,8 +13,18 @@
     drift is a miserable thing to diagnose from a failing test.
 
     The scripts are all written to be idempotent, so re-running one is safe. The version
-    table is not there to make them safe — it is there so an environment can say what it
+    table is not there to make them safe -- it is there so an environment can say what it
     is running, and so a deployment does not take longer every time.
+
+.NOTES
+    Needs PowerShell 7 (pwsh), not Windows PowerShell 5.1: the manifest check uses
+    Resolve-Path -RelativeBasePath, which arrived in 7.3. The workflow runs it with
+    `shell: pwsh` for that reason.
+
+    Note that Export-BaselineSchema.ps1, next door, is the exact opposite -- it drives
+    SMO, which does not load in PowerShell 7, so it has to be run with powershell.exe.
+    Two scripts in one folder needing two different shells is a good way to lose half an
+    hour, so each now says which.
 
 .PARAMETER ValidateOnly
     Checks that every script which changes a database is registered in the manifest, and
@@ -23,7 +33,7 @@
 
 .PARAMETER Baseline
     Records every script as applied WITHOUT running any of them. For adopting a database
-    that already has the schema — this laptop's, for one. Never use it on a database that
+    that already has the schema -- this laptop's, for one. Never use it on a database that
     has not actually had the scripts applied.
 
 .EXAMPLE
@@ -58,13 +68,26 @@ if (-not $ValidateOnly) {
 }
 
 # sqlcmd rather than a SQL client library: it is already on any machine with SQL tooling,
-# it is on the Microsoft-hosted build agents, and it understands GO — which matters,
+# it is on the Microsoft-hosted build agents, and it understands GO -- which matters,
 # because these scripts use batch separators and splitting on them by hand is a known
 # way to break DDL that must stand alone in its own batch.
 $sqlcmd = (Get-Command sqlcmd -ErrorAction SilentlyContinue).Source
 if (-not $sqlcmd -and -not $ValidateOnly) { throw "sqlcmd is not on PATH. Install the SQL Server command line tools." }
 
-$auth = if ($Integrated) { @('-E') } else { @('-U', $User, '-P', $Password) }
+# The password goes in SQLCMDPASSWORD rather than after -P, for two separate reasons.
+#
+# sqlcmd reads the argument after -P as a flag when it starts with a dash, and the dev
+# password does. The whole run died on "Sqlcmd: '-P': Missing argument" -- which names the
+# wrong thing, says nothing about the password, and is a miserable half hour for anybody
+# who has not seen it before. An environment variable has no such parsing.
+#
+# And an argument is visible to anyone who can list processes on the machine, including
+# on a build agent. A variable set on this process is not.
+$auth = @('-E')
+if (-not $Integrated) {
+    $env:SQLCMDPASSWORD = $Password
+    $auth = @('-U', $User)
+}
 # -b so a failing script fails this script. Without it sqlcmd reports the error and
 # exits zero, and a broken deployment looks like a successful one.
 $common = @('-S', $Server, '-d', $Database, '-C', '-b') + $auth
@@ -144,6 +167,51 @@ if ($ValidateOnly) {
     exit 0
 }
 
+# ------------------------------------------------------------------ waking the database
+# The non-production databases are Azure SQL serverless and pause after an hour idle. The
+# first connection then fails or hangs for 30-90s while it resumes, which looks exactly
+# like a broken deployment to anybody who has not met it before -- and in CI it simply
+# fails the job. Bootstrap-AzureDatabase.ps1 has always retried through this; this script
+# did not, which is an odd division given this is the one that runs often.
+#
+# A login failure is NOT retried. It is not transient, it will never become true by
+# waiting, and hammering an authentication endpoint with a password already known to be
+# wrong is both pointless and the sort of thing that locks an account.
+function Wait-ForDatabase {
+    param([int] $TimeoutSeconds = 180)
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $attempt = 0
+    $announced = $false
+
+    while ($true) {
+        $attempt++
+        $out = & $sqlcmd @($common + @('-l', '30', '-Q', 'SET NOCOUNT ON; SELECT 1')) 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            if ($announced) { Write-Host "  awake after $attempt attempt(s)." -ForegroundColor Green; Write-Host "" }
+            return
+        }
+
+        $text = $out | Out-String
+
+        if ($text -match 'Login failed|password|not associated with a trusted') {
+            throw "Could not sign in to $Database on $Server.`n$text"
+        }
+
+        if ((Get-Date) -ge $deadline) {
+            throw "Gave up waiting for $Database on $Server after ${TimeoutSeconds}s.`n$text"
+        }
+
+        if (-not $announced) {
+            Write-Host "  database is asleep -- waiting for it to resume" -ForegroundColor Yellow
+            $announced = $true
+        }
+        Start-Sleep -Seconds 10
+    }
+}
+
+Wait-ForDatabase
+
 # ------------------------------------------------------------------ the ledger
 Invoke-Sql -Query @"
 IF OBJECT_ID('dbo.schema_versions', 'U') IS NULL
@@ -180,7 +248,7 @@ foreach ($script in $planned) {
 
     if ($applied.ContainsKey($script)) {
         # A script that changed after it was applied is worth saying out loud. It is not
-        # necessarily wrong — a fixed typo in a comment is harmless — but it means this
+        # necessarily wrong -- a fixed typo in a comment is harmless -- but it means this
         # database did not necessarily get what the file now says.
         if ($applied[$script] -ne $hash) { $drifted += $script }
         continue
@@ -194,7 +262,7 @@ foreach ($d in $drifted) {
 if ($drifted) { Write-Host "" }
 
 if (-not $todo) {
-    Write-Host "  Already up to date — $($applied.Count) scripts applied." -ForegroundColor Green
+    Write-Host "  Already up to date -- $($applied.Count) scripts applied." -ForegroundColor Green
     Write-Host ""
     exit 0
 }
@@ -204,7 +272,7 @@ $todo | ForEach-Object { Write-Host "     $($_.Script)" }
 Write-Host ""
 
 if ($DryRun) {
-    Write-Host "  Dry run — nothing was changed." -ForegroundColor Yellow
+    Write-Host "  Dry run -- nothing was changed." -ForegroundColor Yellow
     Write-Host ""
     exit 0
 }
@@ -239,7 +307,7 @@ foreach ($item in $todo) {
     }
 
     # Recorded only after it succeeded. A script that failed halfway must be able to run
-    # again — recording it first would hide the failure from the next deployment.
+    # again -- recording it first would hide the failure from the next deployment.
     $name = $item.Script.Replace("'", "''")
     Invoke-Sql -Query @"
 INSERT INTO dbo.schema_versions (script_name, checksum, duration_ms)
@@ -251,7 +319,7 @@ Write-Host ""
 
 if ($failed) {
     Write-Host "  Stopped at $failed. Nothing after it was attempted." -ForegroundColor Red
-    Write-Host "  Fix it and run again — everything before it stays applied." -ForegroundColor Red
+    Write-Host "  Fix it and run again -- everything before it stays applied." -ForegroundColor Red
     Write-Host ""
     exit 1
 }
