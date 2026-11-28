@@ -7,7 +7,7 @@ description: The fixed value-sets this database enforces with CHECK constraints 
 
 ## Why this exists
 
-This schema restricts 125 columns to fixed sets of values, almost all enforced **only** by a
+This schema restricts 127 columns to fixed sets of values, almost all enforced **only** by a
 SQL Server `CHECK` constraint. The API's OpenAPI document types those columns as `string`,
 so the allowed values appear nowhere a caller can read them. A value the API's own DTO
 accepts can still be rejected by the database, and the failure arrives as a constraint

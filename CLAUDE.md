@@ -19,7 +19,7 @@ Three files claim to describe the schema. Only one is true.
 
 | File | Status |
 | --- | --- |
-| `deploy/baseline-schema.sql` | **The live schema.** 81 tables, 76 tenant foreign keys. Scripted from a database with every migration applied. |
+| `deploy/baseline-schema.sql` | **The live schema.** 83 tables, 246 foreign keys. Scripted from a database with every migration applied. |
 | `dbo/Tables/*.sql` | **Stale — pre-tenancy.** 52 files, **zero** mention of `tenant_id`. |
 | `dbo/Tables/DB_Scripts.sql` | **Dead.** A 68 KB, 49-table dump for a database called `ayur_clinic`. Not in the manifest. Never run it. |
 
@@ -106,7 +106,7 @@ it appears in `deploy/baseline-schema.sql` and not in `dbo/Tables/`.
 
 ## Column vocabularies are enforced here, and only here
 
-153 `CHECK` constraints across 28 columns restrict values to a fixed set, and **most are
+159 `CHECK` constraints across 30 columns restrict values to a fixed set, and **most are
 invisible to the API's OpenAPI document**. A value the API's own DTO accepts can still be
 rejected by the database.
 
@@ -149,11 +149,12 @@ sqlcmd -S <server> -d <database> -U <user> -P <pw> -C -b -h -1 -W -Q "SET NOCOUN
 
 ## ⚠️ Re-export `baseline-schema.sql` whenever you add a migration
 
-It is current as of **28 November 2026**: all 16 tenancy migrations, all 22 manifest
-scripts, `Pharmacist` and `doctors.staff_id` both in it. Rebuilt from scratch into an
-empty database that day to prove it still builds one — 81 tables, 1222 columns, 244
-foreign keys, 154 check constraints, 99 catalogue rows. Those are the live counts less
-`dbo.schema_versions` and its five columns, which the exporter omits deliberately.
+It is current as of **29 November 2026**: all 17 tenancy migrations, all 24 manifest
+scripts, with `clinic_settings`, `clinic_logos`, `Pharmacist` and `doctors.staff_id` all
+in it. Rebuilt from scratch into an empty database that day to prove it still builds one —
+83 tables, 1259 columns, 246 foreign keys, 159 check constraints, 99 catalogue rows. Those
+are the live counts less `dbo.schema_versions` and its five columns, which the exporter
+omits deliberately.
 
 **Letting it fall behind is not cosmetic, and it has already cost two outages.**
 `Bootstrap-AzureDatabase.ps1` finishes with `Apply-Database -Baseline`, which records
@@ -167,6 +168,11 @@ thirteen migrations, and every query touching `staff` failed with `Invalid colum
 'consultation_fee'` (SQL 207) once the API expected the merged shape. The same database
 was still missing 14 and 15 on 28 November, failing on `staff_id`, and had to have all
 three applied by hand.
+
+`sqldb-clinic-dev` is behind again by design rather than by accident: it has 22 of the 24
+manifest scripts, and 17 plus the Settings screen seed arrive when the clinic-settings
+change is deployed to it. The baseline in this repo is already ahead of it, which is the
+right way round — the mistake is only ever the other way.
 
 So, **after adding `tenancy/NN-*.sql` and the manifest entry**, re-export — from a
 database that genuinely has it applied, which `Apply-Database.ps1` will confirm:
